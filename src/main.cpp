@@ -69,7 +69,7 @@ protected:
 
     void onButton(CCObject*) {
         auto path = Mod::get()->getConfigDir() / "customtext.txt";
-        // create the file with a default template if it doesn't exist
+        // create the file with a default template if it doesn't exist yet
         if (!std::filesystem::exists(path))
             std::ofstream(path) << DEFAULT_TEMPLATE;
 #ifdef GEODE_IS_WINDOWS
@@ -156,7 +156,7 @@ static std::string getCustomTextFromFile() {
 // fills in all the template vars in the message
 static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
     auto mod = Mod::get();
-    bool rolePing  = mod->getSettingValue<bool>("role-ping");
+    bool rolePing   = mod->getSettingValue<bool>("role-ping");
     std::string roleID  = mod->getSettingValue<std::string>("role-id");
     std::string creator = level->m_creatorName;
     std::string name    = level->m_levelName;
@@ -184,12 +184,9 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
         replace("{role}", rolePing ? fmt::format("<@&{}>", roleID) : "");
         text = processConditionals(text, isUpdate);
     } else {
-        text = fmt::format(
-            isUpdate
-                ? "## Level Updated!\n{} UPDATED a level!\n### {}\n#### {}\n-# {} ({} objects)"
-                : "## New Level!\n{} dropped a new level!\n### {}\n#### {}\n-# {} ({} objects)",
-            creator, name, id, length, objects
-        );
+        text = isUpdate
+            ? fmt::format("## Level Updated!\n{} UPDATED a level!\n### {}\n#### {}\n-# {} ({} objects)", creator, name, id, length, objects)
+            : fmt::format("## New Level!\n{} dropped a new level!\n### {}\n#### {}\n-# {} ({} objects)", creator, name, id, length, objects);
         // role ping goes at the bottom spoilered in the preset
         if (rolePing)
             text += fmt::format("\n||<@&{}>||", roleID);
