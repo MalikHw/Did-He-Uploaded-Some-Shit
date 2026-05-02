@@ -1,11 +1,116 @@
 #include <Geode/Geode.hpp>
 #include <Geode/utils/web.hpp>
+#include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/UploadPopup.hpp>
-#include <Geode/loader/Event.hpp>
+#include <fstream>
+#include <sstream>
 
 using namespace geode::prelude;
 
-// converts m_levelLength int to a readable string so i dont fuck out
+// button setting that opens customtext.txt in notepad (windows) or the config folder (other)
+class OpenFileButtonSettingV3 : public SettingV3 {
+public:
+    static Result<std::shared_ptr<OpenFileButtonSettingV3>> parse(
+        std::string const& key,
+        std::string const& modID,
+        matjson::Value const& json
+    ) {
+        auto res = std::make_shared<OpenFileButtonSettingV3>();
+        auto root = checkJson(json, "OpenFileButtonSettingV3");
+        res->init(key, modID, root);
+        res->parseNameAndDescription(root);
+        root.checkUnknownKeys();
+        return root.ok(std::move(res));
+    }
+
+    bool load(matjson::Value const&) override { return true; }
+    bool save(matjson::Value&) const override  { return true; }
+    bool isDefaultValue() const override        { return true; }
+    void reset() override {}
+
+    SettingNodeV3* createNode(float width) override;
+};
+
+class OpenFileButtonSettingNodeV3 : public SettingNodeV3 {
+protected:
+    ButtonSprite* m_buttonSprite;
+    CCMenuItemSpriteExtra* m_button;
+
+    bool init(std::shared_ptr<OpenFileButtonSettingV3> setting, float width) {
+        if (!SettingNodeV3::init(setting, width)) return false;
+
+        m_buttonSprite = ButtonSprite::create("Open File", "goldFont.fnt", "GJ_button_01.png", .8f);
+        m_buttonSprite->setScale(.65f);
+        m_button = CCMenuItemSpriteExtra::create(
+            m_buttonSprite, this,
+            menu_selector(OpenFileButtonSettingNodeV3::onButton)
+        );
+        this->getButtonMenu()->addChildAtPosition(m_button, Anchor::Center);
+        this->getButtonMenu()->setContentWidth(80);
+        this->getButtonMenu()->updateLayout();
+        this->updateState(nullptr);
+        return true;
+    }
+
+    void updateState(CCNode* invoker) override {
+        SettingNodeV3::updateState(invoker);
+        auto ok = this->getSetting()->shouldEnable();
+        m_button->setEnabled(ok);
+        m_buttonSprite->setCascadeColorEnabled(true);
+        m_buttonSprite->setCascadeOpacityEnabled(true);
+        m_buttonSprite->setOpacity(ok ? 255 : 155);
+        m_buttonSprite->setColor(ok ? ccWHITE : ccGRAY);
+    }
+
+    void onButton(CCObject*) {
+        auto path = Mod::get()->getConfigDir() / "customtext.txt";
+        // create the file with a default template if it doesn't exist yet
+        if (!std::filesystem::exists(path)) {
+            std::ofstream f(path);
+            f << "{isUploaded\"## New Level!\"}{isUpdated\"## Level Updated!\"}{n}"
+                 "{creator} {isUploaded\"dropped a new level!\"}{isUpdated\"updated a level!\"}{n}"
+                 "### {name}{n}#### {id}{n}-# {lengh} ({objects} objects){n}{role}";
+        }
+#ifdef GEODE_IS_WINDOWS
+        auto wpath = path.wstring();
+        ShellExecuteW(nullptr, L"open", L"notepad.exe", wpath.c_str(), nullptr, SW_SHOW);
+#else
+        utils::file::openFolder(Mod::get()->getConfigDir());
+#endif
+    }
+
+    void onCommit() override {}
+    void onResetToDefault() override {}
+
+public:
+    static OpenFileButtonSettingNodeV3* create(
+        std::shared_ptr<OpenFileButtonSettingV3> setting, float width
+    ) {
+        auto ret = new OpenFileButtonSettingNodeV3();
+        if (ret->init(setting, width)) { ret->autorelease(); return ret; }
+        delete ret;
+        return nullptr;
+    }
+
+    bool hasUncommittedChanges() const override { return false; }
+    bool hasNonDefaultValue()    const override { return false; }
+
+    std::shared_ptr<OpenFileButtonSettingV3> getSetting() const {
+        return std::static_pointer_cast<OpenFileButtonSettingV3>(SettingNodeV3::getSetting());
+    }
+};
+
+SettingNodeV3* OpenFileButtonSettingV3::createNode(float width) {
+    return OpenFileButtonSettingNodeV3::create(
+        std::static_pointer_cast<OpenFileButtonSettingV3>(shared_from_this()), width
+    );
+}
+
+$on_mod(Loaded) {
+    (void)Mod::get()->registerCustomSettingType("open-file-button", &OpenFileButtonSettingV3::parse);
+}
+
+// Converts m_levelLength int to a readable string so i don't fuck out mid code
 static std::string lengthString(int len) {
     switch (len) {
         case 0: return "Tiny";
@@ -17,7 +122,8 @@ static std::string lengthString(int len) {
         default: return "Unknown";
     }
 }
-// Processes {isUploaded"..."} and {isUpdated"..."} vars
+
+// Processes {isUploaded"..."} and {isUpdated"..."} conditional vars
 static std::string processConditionals(std::string text, bool isUpdate) {
     auto process = [&](std::string& str, std::string const& tag, bool show) {
         std::string open = "{" + tag + "\"";
@@ -33,16 +139,31 @@ static std::string processConditionals(std::string text, bool isUpdate) {
         }
     };
     process(text, "isUploaded", !isUpdate);
-    process(text, "isUpdated", isUpdate);
+    process(text, "isUpdated",  isUpdate);
     return text;
 }
 
-// fills in all the template variables in the message
+// reads customtext.txt from config dir, creates it with a default template if missing
+static std::string getCustomTextFromFile() {
+    auto path = Mod::get()->getConfigDir() / "customtext.txt";
+    if (!std::filesystem::exists(path)) {
+        std::ofstream f(path);
+        f << "{isUploaded\"## New Level!\"}{isUpdated\"## Level Updated!\"}{n}"
+             "{creator} {isUploaded\"dropped a new level!\"}{isUpdated\"updated a level!\"}{n}"
+             "### {name}{n}#### {id}{n}-# {lengh} ({objects} objects){n}{role}";
+    }
+    std::ifstream f(path);
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+// fills in all the template vars in the message
 static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
     auto mod = Mod::get();
     bool useCustom = mod->getSettingValue<bool>("use-custom-text");
     bool rolePing  = mod->getSettingValue<bool>("role-ping");
-    std::string roleID = mod->getSettingValue<std::string>("role-id");
+    std::string roleID  = mod->getSettingValue<std::string>("role-id");
     std::string creator = level->m_creatorName;
     std::string name    = level->m_levelName;
     std::string id      = std::to_string((int)level->m_levelID);
@@ -50,8 +171,8 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
     std::string objects = std::to_string((int)level->m_objectCount);
     std::string text;
     if (useCustom) {
-        text = mod->getSettingValue<std::string>("custom-text");
-        // replace simple variables
+        text = getCustomTextFromFile();
+        // replace simple vars
         auto replace = [&](std::string& s, std::string const& from, std::string const& to) {
             size_t pos = 0;
             while ((pos = s.find(from, pos)) != std::string::npos) {
@@ -59,23 +180,20 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
                 pos += to.size();
             }
         };
-
         replace(text, "{n}",       "\n");
         replace(text, "{creator}", creator);
         replace(text, "{name}",    name);
         replace(text, "{id}",      id);
         replace(text, "{lengh}",   length);
         replace(text, "{objects}", objects);
-
         // role ping in custom text via {role}
         replace(text, "{role}", rolePing ? fmt::format("<@&{}>", roleID) : "");
-
         text = processConditionals(text, isUpdate);
     } else {
         if (isUpdate) {
             text = fmt::format(
                 "## Level Updated!\n"
-                "{} updated a level!\n"
+                "{} UPDATED a level!\n"
                 "### {}\n"
                 "#### {}\n"
                 "-# {} ({} objects)",
@@ -91,8 +209,7 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
                 creator, name, id, length, objects
             );
         }
-
-        // Role ping goes at the bottom spoilered in the preset
+        // role ping goes at the bottom spoilered in the preset
         if (rolePing) {
             text += fmt::format("\n||<@&{}>||", roleID);
         }
@@ -103,8 +220,9 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
 // Fire and forget, sends the webhook, logs success/failure
 static void sendWebhook(GJGameLevel* level, bool isUpdate) {
     if (!Mod::get()->getSettingValue<bool>("enabled")) return;
-    std::string webhookURL = Mod::get()->getSettingValue<std::string>("webhook-url");
-    if (webhookURL.empty()) {
+    // prepend https:// since the setting can't store colons/slashes
+    std::string webhookURL = "https://" + Mod::get()->getSettingValue<std::string>("webhook-url");
+    if (webhookURL == "https://") {
         log::warn("Webhook URL is empty, skipping");
         return;
     }
@@ -114,15 +232,15 @@ static void sendWebhook(GJGameLevel* level, bool isUpdate) {
     auto req = web::WebRequest();
     req.header("Content-Type", "application/json");
     req.bodyJSON(json);
-
-    // async::spawn fire-and-forget
+    // async::spawn
     async::spawn(
         req.post(webhookURL),
         [](web::WebResponse res) {
             if (res.ok()) {
                 log::info("Webhook sent successfully ({})", res.code());
             } else {
-                log::warn("Webhook failed with status {}: {}", res.code(), res.string().unwrapOr("no body"));
+                log::warn("Webhook failed with status {}: {}",
+                    res.code(), res.string().unwrapOr("no body"));
             }
         }
     );
@@ -131,7 +249,7 @@ static void sendWebhook(GJGameLevel* level, bool isUpdate) {
 class $modify(UploadPopup) {
     void levelUploadFinished(GJGameLevel* level) {
         UploadPopup::levelUploadFinished(level);
-        // m_levelVersion > 1 means the level already existed on the servers
+        // m_levelVersion > 1 means the level already on the servers
         bool isUpdate = level->m_levelVersion > 1;
         if (isUpdate && !Mod::get()->getSettingValue<bool>("send-on-update")) return;
         sendWebhook(level, isUpdate);
