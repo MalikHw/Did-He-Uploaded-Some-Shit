@@ -27,7 +27,8 @@
             "name": "Webhook URL",
             "description": "Discord webhook URL to send to",
             "type": "string",
-            "default": ""
+            "default": "",
+            "filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!+-/:;',._?=%&<>*"
         },
         "send-on-update": {
             "name": "Send on Level Update",
@@ -37,15 +38,14 @@
         },
         "use-custom-text": {
             "name": "Use Custom Text",
-            "description": "Use your own message template instead of the default one.",
+            "description": "Use your own message template from customtext.txt instead of the default one",
             "type": "bool",
             "default": false
         },
-        "custom-text": {
+        "open-custom-text": {
             "name": "Custom Text",
-            "description": "Your message template! Variables: {n} newline, {creator} your username, {name} level name, {id}, {lengh} (Shows Tiny/Short/Medium/Long/XL/Plat), {objects} count, {role} role ping, {isUploaded\"text\"} text on new uploads only, {isUpdated\"text\"} text on updates only",
-            "type": "string",
-            "default": ""
+            "description": "Opens customtext.txt(on windows) in your mod config folder. Variables: {n} newline, {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
+            "type": "button"
         },
         "role-ping": {
             "name": "Role Ping",
@@ -57,7 +57,8 @@
             "name": "Role ID",
             "description": "the Discord role ID to ping. In the preset this appears spoilered at the bottom. In custom text, place {role} wherever you want it!",
             "type": "string",
-            "default": ""
+            "default": "",
+            "filter": "1234567890"
         }
     }
 }
