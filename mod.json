@@ -7,21 +7,57 @@
         "ios": "2.2081"
     },
     "version": "1.0.0",
-    "id": "malikhw47.smth",
-    "name": "nam",
+    "id": "malikhw47.didheuploadsmth",
+    "name": "Did He Upload Something!",
     "developer": "MalikHw47",
     "description": "desc.",
-    "tags": ["yes", "yeah"],
+    "tags": ["utility", "online"],
     "links": {
-        "source": "https://github.com/MalikHw/geode-template",
+        "source": "https://github.com/MalikHw/Did-He-Uploaded-Some-Shit",
         "community": "https://discord.gg/G9bZ92eg2n"
     },
-    "settings": {},
-    "suggested": [
-        {
-            "id": "something",
-            "importance": "recommended",
-            "reason": "n"
+    "settings": {
+        "enabled": {
+            "name": "Enabled",
+            "description": "toggle the notif on/off",
+            "type": "bool",
+            "default": true
+        },
+        "webhook-url": {
+            "name": "Webhook URL",
+            "description": "Discord webhook URL to send to",
+            "type": "string",
+            "default": ""
+        },
+        "send-on-update": {
+            "name": "Send on Level Update",
+            "description": "also send a webhook when you update an existing level",
+            "type": "bool",
+            "default": true
+        },
+        "use-custom-text": {
+            "name": "Use Custom Text",
+            "description": "Use your own message template instead of the default one.",
+            "type": "bool",
+            "default": false
+        },
+        "custom-text": {
+            "name": "Custom Text",
+            "description": "Your message template! Variables: {n} newline, {creator} your username, {name} level name, {id}, {lengh} (Shows Tiny/Short/Medium/Long/XL/Plat), {objects} count, {role} role ping, {isUploaded\"text\"} text on new uploads only, {isUpdated\"text\"} text on updates only",
+            "type": "string",
+            "default": ""
+        },
+        "role-ping": {
+            "name": "Role Ping",
+            "description": "ping a role when a message is sent",
+            "type": "bool",
+            "default": false
+        },
+        "role-id": {
+            "name": "Role ID",
+            "description": "the Discord role ID to ping. In the preset this appears spoilered at the bottom. In custom text, place {role} wherever you want it!",
+            "type": "string",
+            "default": ""
         }
-    ]
+    }
 }
