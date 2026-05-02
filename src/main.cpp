@@ -1,10 +1,11 @@
 #include <Geode/Geode.hpp>
 #include <Geode/utils/web.hpp>
 #include <Geode/modify/UploadPopup.hpp>
+#include <Geode/loader/Event.hpp>
 
 using namespace geode::prelude;
 
-// Converts m_levelLength int to a readable string so i don't fuck out mid code
+// converts m_levelLength int to a readable string so i dont fuck out
 static std::string lengthString(int len) {
     switch (len) {
         case 0: return "Tiny";
@@ -16,8 +17,7 @@ static std::string lengthString(int len) {
         default: return "Unknown";
     }
 }
-
-// Processes {isUploaded"..."} and {isUpdated"..."} conditional vars
+// Processes {isUploaded"..."} and {isUpdated"..."} vars
 static std::string processConditionals(std::string text, bool isUpdate) {
     auto process = [&](std::string& str, std::string const& tag, bool show) {
         std::string open = "{" + tag + "\"";
@@ -37,7 +37,7 @@ static std::string processConditionals(std::string text, bool isUpdate) {
     return text;
 }
 
-// fills in all the template vars in the message
+// fills in all the template variables in the message
 static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
     auto mod = Mod::get();
     bool useCustom = mod->getSettingValue<bool>("use-custom-text");
@@ -51,7 +51,7 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
     std::string text;
     if (useCustom) {
         text = mod->getSettingValue<std::string>("custom-text");
-        // replace simple vars
+        // replace simple variables
         auto replace = [&](std::string& s, std::string const& from, std::string const& to) {
             size_t pos = 0;
             while ((pos = s.find(from, pos)) != std::string::npos) {
@@ -59,20 +59,23 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
                 pos += to.size();
             }
         };
+
         replace(text, "{n}",       "\n");
         replace(text, "{creator}", creator);
         replace(text, "{name}",    name);
         replace(text, "{id}",      id);
         replace(text, "{lengh}",   length);
         replace(text, "{objects}", objects);
+
         // role ping in custom text via {role}
         replace(text, "{role}", rolePing ? fmt::format("<@&{}>", roleID) : "");
+
         text = processConditionals(text, isUpdate);
     } else {
         if (isUpdate) {
             text = fmt::format(
                 "## Level Updated!\n"
-                "{} UPDATED a level!\n"
+                "{} updated a level!\n"
                 "### {}\n"
                 "#### {}\n"
                 "-# {} ({} objects)",
@@ -88,7 +91,8 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
                 creator, name, id, length, objects
             );
         }
-        // role ping goes at the bottom spoilered in the preset
+
+        // Role ping goes at the bottom spoilered in the preset
         if (rolePing) {
             text += fmt::format("\n||<@&{}>||", roleID);
         }
@@ -110,17 +114,16 @@ static void sendWebhook(GJGameLevel* level, bool isUpdate) {
     auto req = web::WebRequest();
     req.header("Content-Type", "application/json");
     req.bodyJSON(json);
-    // async::spawn
-    req.post(webhookURL).listen(
-        [](web::WebResponse* res) {
-            if (res->ok()) {
-                log::info("Webhook sent successfully ({})", res->code());
+
+    // async::spawn fire-and-forget
+    async::spawn(
+        req.post(webhookURL),
+        [](web::WebResponse res) {
+            if (res.ok()) {
+                log::info("Webhook sent successfully ({})", res.code());
             } else {
-                log::warn("Webhook failed with status {}: {}", res->code(), res->string().unwrapOr("no body"));
+                log::warn("Webhook failed with status {}: {}", res.code(), res.string().unwrapOr("no body"));
             }
-        },
-        []() {
-            log::warn("Webhook request was cancelled");
         }
     );
 }
@@ -128,7 +131,7 @@ static void sendWebhook(GJGameLevel* level, bool isUpdate) {
 class $modify(UploadPopup) {
     void levelUploadFinished(GJGameLevel* level) {
         UploadPopup::levelUploadFinished(level);
-        // m_levelVersion > 1 means the level already on the servers
+        // m_levelVersion > 1 means the level already existed on the servers
         bool isUpdate = level->m_levelVersion > 1;
         if (isUpdate && !Mod::get()->getSettingValue<bool>("send-on-update")) return;
         sendWebhook(level, isUpdate);
