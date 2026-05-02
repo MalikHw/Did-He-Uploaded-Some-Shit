@@ -10,7 +10,7 @@
     "id": "malikhw47.didheuploadsmth",
     "name": "Did He Upload Something!",
     "developer": "MalikHw47",
-    "description": "desc.",
+    "description": "Send a message to a Discord webhook at level upload!",
     "tags": ["utility", "online"],
     "links": {
         "source": "https://github.com/MalikHw/Did-He-Uploaded-Some-Shit",
@@ -44,7 +44,7 @@
         },
         "open-custom-text": {
             "name": "Custom Text",
-            "description": "Opens customtext.txt(on windows) in your mod config folder. Variables: {n} newline, {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
+            "description": "Opens customtext.txt(on windows) in your mod config folder. Variables: {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
             "type": "custom:open-file-button",
             "enable-if": "use-custom-text"
         },
