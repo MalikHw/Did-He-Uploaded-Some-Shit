@@ -45,7 +45,7 @@
         "open-custom-text": {
             "name": "Custom Text",
             "description": "Opens customtext.txt(on windows) in your mod config folder. Variables: {n} newline, {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
-            "type": "custom:open-file-button"
+            "type": "custom:open-file-button",
             "enable-if": "use-custom-text"
         },
         "role-ping": {
