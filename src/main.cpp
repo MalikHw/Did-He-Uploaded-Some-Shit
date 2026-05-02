@@ -7,6 +7,11 @@
 
 using namespace geode::prelude;
 
+static const char* DEFAULT_TEMPLATE =
+    "{isUploaded\"## New Level!\"}{isUpdated\"## Level Updated!\"}\n"
+    "{creator} {isUploaded\"dropped a new level!\"}{isUpdated\"updated a level!\"}\n"
+    "### {name}\n-ID: {id}\n-# {lengh} ({objects} objects)\n{role}";
+
 // button setting that opens customtext.txt in notepad (windows) or the config folder (other)
 class OpenFileButtonSettingV3 : public SettingV3 {
 public:
@@ -39,7 +44,7 @@ protected:
     bool init(std::shared_ptr<OpenFileButtonSettingV3> setting, float width) {
         if (!SettingNodeV3::init(setting, width)) return false;
 
-        m_buttonSprite = ButtonSprite::create("Open File", "goldFont.fnt", "GJ_button_01.png", .8f);
+        m_buttonSprite = ButtonSprite::create("Edit File", "goldFont.fnt", "GJ_button_01.png", .8f);
         m_buttonSprite->setScale(.65f);
         m_button = CCMenuItemSpriteExtra::create(
             m_buttonSprite, this,
@@ -64,16 +69,11 @@ protected:
 
     void onButton(CCObject*) {
         auto path = Mod::get()->getConfigDir() / "customtext.txt";
-        // create the file with a default template if it doesn't exist yet
-        if (!std::filesystem::exists(path)) {
-            std::ofstream f(path);
-            f << "{isUploaded\"## New Level!\"}{isUpdated\"## Level Updated!\"}{n}"
-                 "{creator} {isUploaded\"dropped a new level!\"}{isUpdated\"updated a level!\"}{n}"
-                 "### {name}{n}#### {id}{n}-# {lengh} ({objects} objects){n}{role}";
-        }
+        // create the file with a default template if it doesn't exist
+        if (!std::filesystem::exists(path))
+            std::ofstream(path) << DEFAULT_TEMPLATE;
 #ifdef GEODE_IS_WINDOWS
-        auto wpath = path.wstring();
-        ShellExecuteW(nullptr, L"open", L"notepad.exe", wpath.c_str(), nullptr, SW_SHOW);
+        ShellExecuteW(nullptr, L"open", L"notepad.exe", path.wstring().c_str(), nullptr, SW_SHOW);
 #else
         utils::file::openFolder(Mod::get()->getConfigDir());
 #endif
@@ -93,7 +93,7 @@ public:
     }
 
     bool hasUncommittedChanges() const override { return false; }
-    bool hasNonDefaultValue()    const override { return false; }
+    bool hasNonDefaultValue() const override { return false; }
 
     std::shared_ptr<OpenFileButtonSettingV3> getSetting() const {
         return std::static_pointer_cast<OpenFileButtonSettingV3>(SettingNodeV3::getSetting());
@@ -146,22 +146,16 @@ static std::string processConditionals(std::string text, bool isUpdate) {
 // reads customtext.txt from config dir, creates it with a default template if missing
 static std::string getCustomTextFromFile() {
     auto path = Mod::get()->getConfigDir() / "customtext.txt";
-    if (!std::filesystem::exists(path)) {
-        std::ofstream f(path);
-        f << "{isUploaded\"## New Level!\"}{isUpdated\"## Level Updated!\"}{n}"
-             "{creator} {isUploaded\"dropped a new level!\"}{isUpdated\"updated a level!\"}{n}"
-             "### {name}{n}#### {id}{n}-# {lengh} ({objects} objects){n}{role}";
-    }
-    std::ifstream f(path);
+    if (!std::filesystem::exists(path))
+        std::ofstream(path) << DEFAULT_TEMPLATE;
     std::ostringstream ss;
-    ss << f.rdbuf();
+    ss << std::ifstream(path).rdbuf();
     return ss.str();
 }
 
 // fills in all the template vars in the message
 static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
     auto mod = Mod::get();
-    bool useCustom = mod->getSettingValue<bool>("use-custom-text");
     bool rolePing  = mod->getSettingValue<bool>("role-ping");
     std::string roleID  = mod->getSettingValue<std::string>("role-id");
     std::string creator = level->m_creatorName;
@@ -170,49 +164,35 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
     std::string length  = lengthString(level->m_levelLength);
     std::string objects = std::to_string((int)level->m_objectCount);
     std::string text;
-    if (useCustom) {
+
+    if (mod->getSettingValue<bool>("use-custom-text")) {
         text = getCustomTextFromFile();
         // replace simple vars
-        auto replace = [&](std::string& s, std::string const& from, std::string const& to) {
+        auto replace = [&](std::string const& from, std::string const& to) {
             size_t pos = 0;
-            while ((pos = s.find(from, pos)) != std::string::npos) {
-                s.replace(pos, from.size(), to);
+            while ((pos = text.find(from, pos)) != std::string::npos) {
+                text.replace(pos, from.size(), to);
                 pos += to.size();
             }
         };
-        replace(text, "{n}",       "\n");
-        replace(text, "{creator}", creator);
-        replace(text, "{name}",    name);
-        replace(text, "{id}",      id);
-        replace(text, "{lengh}",   length);
-        replace(text, "{objects}", objects);
+        replace("{creator}", creator);
+        replace("{name}",    name);
+        replace("{id}",      id);
+        replace("{lengh}",   length);
+        replace("{objects}", objects);
         // role ping in custom text via {role}
-        replace(text, "{role}", rolePing ? fmt::format("<@&{}>", roleID) : "");
+        replace("{role}", rolePing ? fmt::format("<@&{}>", roleID) : "");
         text = processConditionals(text, isUpdate);
     } else {
-        if (isUpdate) {
-            text = fmt::format(
-                "## Level Updated!\n"
-                "{} UPDATED a level!\n"
-                "### {}\n"
-                "#### {}\n"
-                "-# {} ({} objects)",
-                creator, name, id, length, objects
-            );
-        } else {
-            text = fmt::format(
-                "## New Level!\n"
-                "{} dropped a new level!\n"
-                "### {}\n"
-                "#### {}\n"
-                "-# {} ({} objects)",
-                creator, name, id, length, objects
-            );
-        }
+        text = fmt::format(
+            isUpdate
+                ? "## Level Updated!\n{} UPDATED a level!\n### {}\n#### {}\n-# {} ({} objects)"
+                : "## New Level!\n{} dropped a new level!\n### {}\n#### {}\n-# {} ({} objects)",
+            creator, name, id, length, objects
+        );
         // role ping goes at the bottom spoilered in the preset
-        if (rolePing) {
+        if (rolePing)
             text += fmt::format("\n||<@&{}>||", roleID);
-        }
     }
     return text;
 }
@@ -220,15 +200,15 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
 // Fire and forget, sends the webhook, logs success/failure
 static void sendWebhook(GJGameLevel* level, bool isUpdate) {
     if (!Mod::get()->getSettingValue<bool>("enabled")) return;
-    // prepend https:// since the setting can't store colons/slashes
-    std::string webhookURL = "https://" + Mod::get()->getSettingValue<std::string>("webhook-url");
-    if (webhookURL == "https://") {
+    std::string webhookURL = Mod::get()->getSettingValue<std::string>("webhook-url");
+    if (webhookURL.empty()) {
         log::warn("Webhook URL is empty, skipping");
         return;
     }
-    std::string message = buildMessage(level, isUpdate);
+    if (!webhookURL.starts_with("https://"))
+        webhookURL = "https://" + webhookURL;
     auto json = matjson::Value();
-    json["content"] = message;
+    json["content"] = buildMessage(level, isUpdate);
     auto req = web::WebRequest();
     req.header("Content-Type", "application/json");
     req.bodyJSON(json);
