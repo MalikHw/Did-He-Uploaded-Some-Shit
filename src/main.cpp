@@ -7,10 +7,12 @@
 
 using namespace geode::prelude;
 
-static const char* DEFAULT_TEMPLATE =
-    "## {isUploaded\"New Level!\"}{isUpdated\"Level Updated!\"}\n"
-    "**{creator} {isUploaded"dropped a new"}{isUpdated"updated a"} level!**\n"
-    "- Name: {name}\n- ID: {id}\n-# {lengh} ({objects} objects)\n{role}";
+static const char* DEFAULT_TEMPLATE = R"(## {isUploaded"New Level!"}{isUpdated"Level Updated!"}
+**{creator} {isUploaded"dropped a new"}{isUpdated"updated a"} level!**
+- Name: {name}
+- ID: {id}
+-# {lengh} ({objects} objects)
+||{role}||)";
 
 // button setting that opens customtext.txt in notepad (windows) or the config folder (other)
 class OpenFileButtonSettingV3 : public SettingV3 {
