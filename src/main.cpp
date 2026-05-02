@@ -10,7 +10,7 @@ using namespace geode::prelude;
 // button setting that opens customtext.txt in notepad (windows) or the config folder (other)
 class OpenFileButtonSettingV3 : public SettingV3 {
 public:
-    static Result<std::shared_ptr<OpenFileButtonSettingV3>> parse(
+    static Result<std::shared_ptr<SettingV3>> parse(
         std::string const& key,
         std::string const& modID,
         matjson::Value const& json
@@ -20,7 +20,7 @@ public:
         res->init(key, modID, root);
         res->parseNameAndDescription(root);
         root.checkUnknownKeys();
-        return root.ok(std::move(res));
+        return root.ok(std::static_pointer_cast<SettingV3>(std::move(res)));
     }
 
     bool load(matjson::Value const&) override { return true; }
