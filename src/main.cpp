@@ -8,9 +8,9 @@
 using namespace geode::prelude;
 
 static const char* DEFAULT_TEMPLATE =
-    "{isUploaded\"## New Level!\"}{isUpdated\"## Level Updated!\"}\n"
-    "{creator} {isUploaded\"dropped a new level!\"}{isUpdated\"updated a level!\"}\n"
-    "### {name}\n-ID: {id}\n-# {lengh} ({objects} objects)\n{role}";
+    "## {isUploaded\"New Level!\"}{isUpdated\"Level Updated!\"}\n"
+    "**{creator} {isUploaded"dropped a new"}{isUpdated"updated a"} level!**\n"
+    "- Name: {name}\n- ID: {id}\n-# {lengh} ({objects} objects)\n{role}";
 
 // button setting that opens customtext.txt in notepad (windows) or the config folder (other)
 class OpenFileButtonSettingV3 : public SettingV3 {
@@ -185,8 +185,8 @@ static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
         text = processConditionals(text, isUpdate);
     } else {
         text = isUpdate
-            ? fmt::format("## Level Updated!\n{} UPDATED a level!\n### {}\n#### {}\n-# {} ({} objects)", creator, name, id, length, objects)
-            : fmt::format("## New Level!\n{} dropped a new level!\n### {}\n#### {}\n-# {} ({} objects)", creator, name, id, length, objects);
+            ? fmt::format("## Level Updated!\n{} Updated a level!\n- Name: {}\n- ID:   {}\n-# {} ({} objects)", creator, name, id, length, objects)
+            : fmt::format("## New Level!\n{} dropped a new level!\n- Name: {}\n- ID:  {}\n-# {} ({} objects)", creator, name, id, length, objects);
         // role ping goes at the bottom spoilered in the preset
         if (rolePing)
             text += fmt::format("\n||<@&{}>||", roleID);
